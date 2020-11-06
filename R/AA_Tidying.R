@@ -24,4 +24,4 @@ key <- read_csv("~/Chem313/313_IPCMS_Lab/Data/Sample_Key.csv", skip = 0) %>%
 aa_merge <- merge(key,aa_tidy)%>%
   clean_names()
 
-saveRDS(aa_merge, file = "~/Chem313/313_IPCMS_Lab/Data/aa_merge.rds")
+write_csv(aa_merge, "~/Chem313/313_IPCMS_Lab/Data/aa_merge.csv")

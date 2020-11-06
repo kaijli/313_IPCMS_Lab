@@ -3,9 +3,10 @@ library(readr)
 library(janitor)
 
 
-icpms <- read.csv("~/Chem313/313_IPCMS_Lab/Data/ICPMS_Data.csv", skip = 1, na = "N/A") %>%
+icpms <- read_csv("~/Chem313/313_IPCMS_Lab/Data/ICPMS_Data.csv", skip = 1, na = "N/A") %>%
   select(-X)
-key <- read.csv("~/Chem313/313_IPCMS_Lab/Data/Sample_Key.csv", skip = 0) %>%
+
+key <- read_csv("~/Chem313/313_IPCMS_Lab/Data/Sample_Key.csv", skip = 0) %>%
   rename(Sample_Key = "Sample Key")
 
 RSD_data <- icpms %>%
@@ -39,4 +40,4 @@ all(RSD_data$Sample_Key==icpms_tidy$Sample_Key, RSD_data$metal==icpms_tidy$metal
 
 icpms_merge <- merge(icpms_tidy, key)%>%
   clean_names()
-saveRDS(aa_merge, file = "~/Chem313/313_IPCMS_Lab/Data/icpms_merge.rds")
+write_csv(icpms_merge, "~/Chem313/313_IPCMS_Lab/Data/icpms_merge.csv")

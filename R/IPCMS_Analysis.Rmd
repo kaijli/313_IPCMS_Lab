@@ -5,26 +5,67 @@ date: "10/30/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r import data}
+icpms_tidy <- read_csv("~/Chem313/313_IPCMS_Lab/Data/ICPMS_tidy_example.csv")%>%
+  select(-X1)
+aa_tidy <- read_csv("~/Chem313/313_IPCMS_Lab/Data/tidy_AA.csv")
 ```
 
-## Including Plots
+```{r for loop lists}
+sample_sites <- unique(filter(icpms_tidy, site != "MB", site != "")$site)
+#excludes method blank and quality control from list of sites
+metals_analyzed <- unique(icpms_tidy$metal)
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+#preview lists to check potential issues:
+sample_sites
+metals_analyzed
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r calibration}
+icpms_cal <- NULL
+
+#initial loop and filter out calibration data
+
+for (unique_metal in metals_analyzed) {
+  cal <- icpms_tidy %>%
+    filter(type == "Cal1" | type == "Cal2" | type == "Cal3") %>%
+    filter(metal == unique_metal) %>%
+    select(concentration, cps, rsd)
+
+
+  #weighted linear regression
+  
+  w <- 1/(cal$cps * cal$rsd) ^2
+  model <- lm(cal$cps ~ cal$concentration, weights = w)
+  
+  slope <- model$coefficients[2]
+  intercept <- model$coefficients[1]
+  slope_std <- summary(model)$coefficients[2,2]
+  intercept_std <- summary(model)$coefficients[1,2]
+  
+  #plot cal curve
+  
+  plot(cal$cps ~ cal$concentration,
+       xlab = paste("Concentration of ", unique_metal, "(ppb)"), #units from std solution prepared at ohsu (ug/L)
+       ylab = "Counts per second") +
+    abline(model, col = "red")+
+    title(paste("Calibration for", unique_metal))
+  
+  #store data and end "for loop"
+  
+  equation <- tibble(metal = unique_metal, slope, slope_std, intercept, intercept_std)  
+  icpms_cal <- rbind(icpms_cal, equation)
+}
+
+icpms_cal
+
+#clearning environment to prevent accidentally using wrong object
+
+remove(equation, cal, slopes, slope_std, intercept, intercept_std, w, model, unique_metal)
+```
+
