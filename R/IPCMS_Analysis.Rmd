@@ -138,7 +138,30 @@ sample_analysis <- function(unique_site){
     }
     return(concentration_data)
   }
-
 ```
 
+```{r run function}
+#create function that runs different function on each of soil sample sites
+#input: a function
+#output: data from with funciton output from each site
+
+run_sites <- function(Function){
+  value <- NULL
+  for(sites in sample_sites){
+    site_value <- Function(sites)
+    value <- rbind(site_value, value)
+  }
+  return(value)
+}
+```
+
+```{r analyze data}
+#analyze method blank and all samples
+
+MB <- sample_analysis("MB") # units ug/kg
+uncor_sample <- run_sites(sample_analysis) #values do not account for dilutions (ug/kg)
+
+MB
+uncor_sample
+```
 
