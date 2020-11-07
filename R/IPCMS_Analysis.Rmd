@@ -226,8 +226,8 @@ sample_data <- merge(icpms_tidy, sample_data_mb) %>% #this adds important detail
          -conc_dil_blanked_error)
 ```
 
-```{r clean-up}
-
+```{r clean-up, warning = FALSE}
+rm(list = ls()[!(ls() %in% c("icpms_tidy", "sample_data"))])
 ```
 
 
