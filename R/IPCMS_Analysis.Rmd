@@ -187,3 +187,47 @@ for(unique_metal in metals_analyzed){
 sample_data_mb
 ```
 
+```{r errors}
+#dilution factors and measurement errors
+
+#error propagation
+
+vol_e <- 1
+mass_e <- 0.001
+dil_1010_e <- sqrt(1^2 + 10^2)
+dil_e <- sqrt((dil_1010_e/1010)^2 + (1/10)^2) #error in 101 dilution factor
+
+#correct for dilutions and propagate error
+
+sample_data <- merge(icpms_tidy, sample_data_mb) %>% #this adds important details like soil mass
+  unique() %>%
+  mutate(conc_blanked = conc_dil_blanked * (total_volume/1000)/(mass_of_soil/1000) * 100,
+         #101 is foactor dilyted by at OHSU to make solutions dilute enough to run ICPMS on.
+         conc_blanked_error = conc_blanked *
+           sqrt((conc_dil_blanked_error/conc_dil_blanked)^2 +
+                  (dil_e/101)^2 +
+                  (mass_e/mass_of_soil)^2 +
+                  (vol_e/total_volume)^2),
+         conc_unblanked = conc_dil * (total_volume/1000)/(mass_of_soil/1000)*101,
+         conc_unblanked_error = conc_unblanked *
+           sqrt((conc_dil_error/conc_dil)^2 +
+                 (dil_e/101)^2 +
+                  (mass_e/mass_of_soil)^2 +
+                  (vol_e/total_volume)^2)) %>%
+  select(-concentration,
+         -type,
+         -mass_of_soil,
+         -total_volume,
+         -cps,
+         -rsd,
+         -conc_dil_blanked,
+         -conc_dil_blanked_error,
+         -conc_dil,
+         -conc_dil_blanked_error)
+```
+
+```{r clean-up}
+
+```
+
+
