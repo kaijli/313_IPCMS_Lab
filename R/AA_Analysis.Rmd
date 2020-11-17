@@ -1,0 +1,227 @@
+---
+title: "AA Analysis"
+author: "Kaitlyn Li"
+date: "11/16/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r import data, message = FALSE}
+aa_tidy <- read_csv("~/Chem313/313_IPCMS_Lab/Data/tidy_AA.csv") %>%
+  select(-ID) %>%
+  rename(rsd = percent_rsd)
+```
+
+```{r for loop lists}
+sample_sites <- unique(filter(aa_tidy, site != "MB", site != "")$site)
+#excludes method blank and quality control from list of sites
+
+#preview lists to check potential issues:
+sample_sites
+```
+
+```{r calibration}
+aa_cal <- NULL
+
+#initial loop and filter out calibration data
+cal <- aa_tidy %>%
+  # filter(type != "Sample") %>%
+  filter(type == "CalStd" | type == "Cal2" | type == "Cal4") %>%
+  select(concentration, mean_abs, rsd)
+
+
+#weighted linear regression
+
+w <- 1/(cal$mean_abs * cal$rsd) ^2
+model <- lm(cal$mean_abs ~ cal$concentration, weights = w)
+
+slope <- model$coefficients[2]
+intercept <- model$coefficients[1]
+slope_std <- summary(model)$coefficients[2,2]
+intercept_std <- summary(model)$coefficients[1,2]
+
+#plot cal curve
+png("aa_cr.png")
+plot(cal$mean_abs ~ cal$concentration,
+     xlab = paste("Concentration of Chromium (ppb)"), #units from std solution prepared at ohsu (ug/L)
+     ylab = "Mean Absorbance") +
+  abline(model, col = "red")+
+  title(paste("Calibration for Chromium"))
+dev.off()
+
+#store data and end "for loop"
+
+equation <- tibble(slope, slope_std, intercept, intercept_std)  
+aa_cal <- rbind(aa_cal, equation)
+
+
+aa_cal
+
+#clearning environment to prevent accidentally using wrong object
+
+remove(equation, cal, slope, slope_std, intercept, intercept_std, w, model)
+```
+
+```{r analysis function}
+#inputs: unique_site (as a character, ex. "A")
+#outputs: concentration vector
+
+sample_analysis <- function(unique_site){
+  #inituate "for loops" to select specific sample and specific metal
+  
+  concentration_data <- NULL
+  
+  sample <- filter(aa_tidy, site == unique_site)
+  data <- NULL
+    
+  for(ID in sample$sample_key){
+    aa_sample_data <- filter(sample, sample_key ==ID)
+    cal <- filter(aa_cal)
+    
+    #convert CPS readings into concentrations
+    
+    #sample analysis
+    
+    m <- cal$slope
+    b <- cal$intercept
+    y <- aa_sample_data$mean_abs
+    
+    b_e <- cal$intercept_std
+    m_e <- cal$slope_std
+    
+    x <- (y-b)/m #unite dependent on calibration standards (kg/mL)
+    
+    RSD <- aa_sample_data$rsd
+    ABS <- aa_sample_data$mean_abs
+    
+    #propagate error in concentration
+    
+    #error propagation
+    
+    e_yb <- sqrt((RSD)^2 + (b_e)^2)
+    #error in y-b from the calibration
+    yb <- ABS-b
+    
+    e_x <- x*sqrt((e_yb/yb)^2 + (m_e/m)^2)
+    #error in x from the calibration
+    
+    #if "site" no in method blank, store concentration data
+    
+    data <- rbind(data, data_frame(sample_key = ID, x, e_x))
+    if (unique_site != "MB"){
+      concentration_data <- data_frame(sample_key = aa_sample_data$sample_key,
+                                       analyst = aa_sample_data$analyst,
+                                       site = unique_site,
+                                       conc_dil = x,
+                                       conc_dil_error = e_x) %>%
+        rbind(concentration_data)
+    }
+  }
+    
+    if (unique_site == "MB") {
+      x <- mean(data$x)
+      e_x <- sd(data$x)
+      concentration_data <- data_frame(site = unique_site,
+                                       conc_dil = x,
+                                       conc_dil_error = e_x) %>%
+        rbind(concentration_data)
+    }
+  
+    return(concentration_data)
+  }
+```
+
+```{r run function}
+#create function that runs different function on each of soil sample sites
+#input: a function
+#output: data from with funciton output from each site
+
+run_sites <- function(Function){
+  value <- NULL
+  for(sites in sample_sites){
+    site_value <- Function(sites)
+    value <- rbind(site_value, value)
+  }
+  return(value)
+}
+```
+
+```{r analyze data}
+#analyze method blank and all samples
+
+MB <- sample_analysis("MB") # units ug/kg
+uncor_sample <- run_sites(sample_analysis) #values do not account for dilutions (ug/kg)
+
+MB
+uncor_sample
+```
+
+```{r corrects}
+#correct for method blank and perform error propagation as needed
+
+aa_sample_data_mb <- NULL
+
+conc_dil_blanked <- uncor_sample$conc_dil - MB$conc_dil
+
+#error propagation: subtraction of MB
+conc_dil_blanked_error <- sqrt((uncor_sample$conc_dil_error)^2 +
+                               (MB$conc_dil_error)^2)
+aa_sample_data_mb <- uncor_sample %>%
+  mutate(conc_dil_blanked, conc_dil_blanked_error) %>%
+  rbind(aa_sample_data_mb)
+
+
+
+aa_sample_data_mb
+```
+
+```{r errors}
+#dilution factors and measurement errors
+
+#error propagation
+
+vol_e <- 1
+mass_e <- 0.001
+dil_1010_e <- sqrt(1^2 + 10^2)
+dil_e <- sqrt((dil_1010_e/1010)^2 + (1/10)^2) #error in 101 dilution factor
+
+#correct for dilutions and propagate error
+
+aa_sample_data <- merge(aa_tidy, aa_sample_data_mb) %>% #this adds important details like soil mass
+  unique() %>%
+  mutate(conc_blanked = conc_dil_blanked * (total_volume/1000)/(mass_of_soil/1000) * 100,
+         #101 is foactor dilyted by at OHSU to make solutions dilute enough to run ICPMS on.
+         conc_blanked_error = conc_blanked *
+           sqrt((conc_dil_blanked_error/conc_dil_blanked)^2 +
+                  (dil_e/101)^2 +
+                  (mass_e/mass_of_soil)^2 +
+                  (vol_e/total_volume)^2),
+         conc_unblanked = conc_dil * (total_volume/1000)/(mass_of_soil/1000)*101,
+         conc_unblanked_error = conc_unblanked *
+           sqrt((conc_dil_error/conc_dil)^2 +
+                 (dil_e/101)^2 +
+                  (mass_e/mass_of_soil)^2 +
+                  (vol_e/total_volume)^2)) %>%
+  select(-concentration,
+         -type,
+         -mass_of_soil,
+         -total_volume,
+         -mean_abs,
+         -rsd,
+         -conc_dil_blanked,
+         -conc_dil_blanked_error,
+         -conc_dil,
+         -conc_dil_blanked_error)
+```
+
+```{r clean-up, warning = FALSE}
+rm(list = ls()[!(ls() %in% c("aa_tidy", "aa_sample_data"))])
+
+write_csv(aa_sample_data, "~/Chem313/313_IPCMS_Lab/Data/aa_sample_data.csv")
+
+```
+

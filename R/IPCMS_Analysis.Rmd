@@ -10,10 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 ```
 
-```{r import data}
+```{r import data, message = FALSE}
 icpms_tidy <- read_csv("~/Chem313/313_IPCMS_Lab/Data/ICPMS_tidy_example.csv")%>%
   select(-X1)
-aa_tidy <- read_csv("~/Chem313/313_IPCMS_Lab/Data/tidy_AA.csv")
+aa_tidy <- read_csv("~/Chem313/313_IPCMS_Lab/Data/tidy_AA.csv") %>%
+  select(-ID)
 ```
 
 ```{r for loop lists}
@@ -49,12 +50,13 @@ for (unique_metal in metals_analyzed) {
   intercept_std <- summary(model)$coefficients[1,2]
   
   #plot cal curve
-  
+  png(paste("icpms_", unique_metal, ".png", sep = ""))
   plot(cal$cps ~ cal$concentration,
        xlab = paste("Concentration of ", unique_metal, "(ppb)"), #units from std solution prepared at ohsu (ug/L)
        ylab = "Counts per second") +
     abline(model, col = "red")+
     title(paste("Calibration for", unique_metal))
+  dev.off()
   
   #store data and end "for loop"
   
@@ -228,6 +230,8 @@ sample_data <- merge(icpms_tidy, sample_data_mb) %>% #this adds important detail
 
 ```{r clean-up, warning = FALSE}
 rm(list = ls()[!(ls() %in% c("icpms_tidy", "sample_data"))])
+
+write_csv(sample_data, "~/Chem313/313_IPCMS_Lab/Data/sample_data.csv")
 ```
 
 
