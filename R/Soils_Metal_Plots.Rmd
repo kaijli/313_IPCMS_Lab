@@ -1,0 +1,165 @@
+---
+title: "Soil Metals Plots"
+author: "Kaitlyn Li"
+date: "11/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(formattable)
+library(latex2exp)
+```
+
+```{r import data, message = FALSE, include=FALSE}
+icpms_sample_data <- read_csv("~/Chem313/313_IPCMS_Lab/Data/icpms_sample_data.csv")
+aa_sample_data <- read_csv("~/Chem313/313_IPCMS_Lab/Data/aa_sample_data.csv")
+```
+
+```{r icpms averages, include=FALSE}
+icpms_avgs <- icpms_sample_data %>%
+  filter(site != "QC" ) %>%
+  group_by(metal) %>%
+  summarize(avg_conc = mean(conc_blanked), 
+            sd = sd(conc_blanked), 
+            n = n(),
+            se = qnorm(0.975)*sd/sqrt(n))%>%
+  select(-sd, -n) %>%
+  rename(Metal = metal, 
+            Concentration = avg_conc) 
+# icpms_avgs 
+
+
+png("~/Chem313/313_IPCMS_Lab/Plots and Images/icpms_averages.png")
+icpms_avgs %>% 
+  ggplot(aes(x = Metal, y = Concentration, ymin = Concentration - se, ymax = Concentration + se, color = Metal, fatten = .45)) + 
+    geom_pointrange() +
+    labs(x = "Metal", y = TeX("\\[Metal\\] $\\mu$g m$^{-3}$"), title = "ICP-MS [Metal] from Johnson Creek Watershed")
+dev.off()
+  
+icpms_avgs <- icpms_avgs %>%
+  rename("+/- SE" = se)
+
+formattable(icpms_avgs,
+            align = c("l", "c", "c"))
+
+
+```
+
+```{r icpms site averages}
+icpms_avgs_site <- icpms_sample_data %>%
+  group_by(metal, site) %>%
+  filter(site != "QC" ) %>%
+  summarize(avg_conc = mean(conc_blanked), 
+            sd = sd(conc_blanked), 
+            n = n(),
+            se = qnorm(0.975)*sd/sqrt(n))%>%
+  select(-sd, -n) %>%
+  rename(Metal = metal, 
+            Concentration = avg_conc,
+         Site = site) 
+# icpms_avgs_site 
+
+png("~/Chem313/313_IPCMS_Lab/Plots and Images/icpms_avg_site.png")
+icpms_avgs_site %>% 
+  ggplot(aes(color = Metal, y = Concentration, ymin = Concentration - se, ymax = Concentration + se, x = Site, fatten = .45)) + 
+    geom_pointrange() +
+    labs(x = "Site", y = TeX("\\[Metal\\] $\\mu$g m$^{-3}$"), title = "ICP-MS [Metal] from Johnson Creek Watershed")
+dev.off()
+
+icpms_avgs_site <- icpms_avgs_site %>%
+  rename("+/- SE" = se)
+
+formattable(icpms_avgs_site,
+            align = c("l", "c", "c"))
+
+```
+
+```{r icpms qcs}
+icpms_qc <- icpms_sample_data %>%
+  filter(site == "QC" ) %>%
+  group_by(metal, site) %>%
+  summarize(avg_conc = mean(conc_blanked), 
+            sd = sd(conc_blanked), 
+            n = n(),
+            se = qnorm(0.975)*sd/sqrt(n))%>%
+  select(-sd, -n)%>%
+  rename(Metal = metal, 
+            Concentration = avg_conc,
+         Site = site) 
+# icpms_qc 
+
+png("~/Chem313/313_IPCMS_Lab/Plots and Images/icpms_qc.png")
+icpms_qc %>% 
+  ggplot(aes(x = Metal, y = Concentration, ymin = Concentration - se, ymax = Concentration + se, color = Site, fatten = .45)) + 
+    geom_pointrange() +
+    labs(x = "Metal", y = TeX("\\[Metal\\] $\\mu$g m$^{-3}$"), title = "ICP-MS [Metal] QC from Buffalo River")
+dev.off()
+
+icpms_qc <- icpms_qc %>%
+  rename("+/- SE" = se)
+
+formattable(icpms_qc,
+            align = c("l", "c", "c"))
+icpms_qc 
+```
+
+```{r aa site averages}
+aa_avgs_site <- aa_sample_data %>%
+  group_by(site) %>%
+  filter(site != "QC" ) %>%
+  summarize(avg_conc = mean(conc_blanked), 
+            sd = sd(conc_blanked), 
+            n = n(),
+            se = qnorm(0.975)*sd/sqrt(n))%>%
+  select(-sd, -n)%>%
+  rename(Concentration = avg_conc,
+         Site = site) 
+# aa_avgs_site 
+
+png("~/Chem313/313_IPCMS_Lab/Plots and Images/aa_avgs_site.png")
+aa_avgs_site %>% 
+  ggplot(aes(x = Site, y = Concentration, ymin = Concentration - se, ymax = Concentration + se, color = Site, fatten = .45)) + 
+    geom_pointrange() +
+    labs(x = "Metal", y = TeX("\\[Metal\\] $\\mu$g m$^{-3}$"), title = "AA [Cr] from Johnson Creek Watershed")
+dev.off()
+
+aa_avgs_site <- aa_avgs_site %>%
+  rename("+/- SE" = se)
+
+formattable(aa_avgs_site,
+            align = c("l", "c", "c"))
+aa_avgs_site 
+```
+
+```{r combo}
+cr_combo <- icpms_sample_data %>%
+  group_by(metal, site) %>%
+  filter(metal == "Cr52") %>%
+  summarize(avg_conc = mean(conc_blanked), 
+            sd = sd(conc_blanked), 
+            n = n(),
+            se = qnorm(0.975)*sd/sqrt(n))%>%
+  select(-sd, -n) %>%
+  rename(Metal = metal, 
+            Concentration = avg_conc,
+         Site = site,
+         SE = se) %>%
+  mutate(Analysis = "ICP-MS")
+
+aa_avgs_site <- aa_avgs_site %>%
+  mutate(Analysis = "AA") %>%
+  rename(SE = "+/- SE")
+
+cr_combo <- bind_rows(cr_combo, aa_avgs_site) 
+  
+png("~/Chem313/313_IPCMS_Lab/Plots and Images/cr_combo.png")
+cr_combo %>%
+  ggplot(aes(x = Site, y = Concentration, ymin = Concentration - SE, ymax = Concentration + SE, color = Analysis, fatten = .45)) + 
+    geom_pointrange() +
+    labs(x = "Site", y = TeX("\\[Metal\\] $\\mu$g m$^{-3}$"), title = "ICP-MS and AA [Cr] from Johnson Creek Watershed")
+dev.off()
+```
+
+

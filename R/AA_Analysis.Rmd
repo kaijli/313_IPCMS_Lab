@@ -45,7 +45,7 @@ slope_std <- summary(model)$coefficients[2,2]
 intercept_std <- summary(model)$coefficients[1,2]
 
 #plot cal curve
-png("aa_cr.png")
+png("~/Chem313/313_IPCMS_Lab/Plots and Images/aa_cr.png")
 plot(cal$mean_abs ~ cal$concentration,
      xlab = paste("Concentration of Chromium (ppb)"), #units from std solution prepared at ohsu (ug/L)
      ylab = "Mean Absorbance") +
@@ -61,7 +61,7 @@ aa_cal <- rbind(aa_cal, equation)
 
 aa_cal
 
-#clearning environment to prevent accidentally using wrong object
+#cleaning environment to prevent accidentally using wrong object
 
 remove(equation, cal, slope, slope_std, intercept, intercept_std, w, model)
 ```
@@ -222,6 +222,5 @@ aa_sample_data <- merge(aa_tidy, aa_sample_data_mb) %>% #this adds important det
 rm(list = ls()[!(ls() %in% c("aa_tidy", "aa_sample_data"))])
 
 write_csv(aa_sample_data, "~/Chem313/313_IPCMS_Lab/Data/aa_sample_data.csv")
-
 ```
 
